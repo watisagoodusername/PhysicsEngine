@@ -44,6 +44,7 @@ class ballcollider {
     float mass;
     Vector2 velocity;
     Vector2 position;
+    bool held = false;
 
     public:
         ballcollider(float r, float xpos, float ypos, float m = 1, float xvel = 0, float yvel = 0) {
@@ -55,16 +56,24 @@ class ballcollider {
             velocity.y = yvel;
         }
 
-        void clicked(Vector2 mousepos) {
+        void clicked(Vector2 mousepos, float maxspeed) {
             Vector2 dif = Vector2Subtract(mousepos, position);
+            dif = Vector2ClampValue(dif, 0, maxspeed);
             velocity = dif;
+            position = Vector2Subtract(mousepos, dif);
         }
 
-        void update(Vector2 mousepos, bool mousedown) {
-            if (mousedown) {
+        void update(Vector2 mousepos, bool press, bool release) {
+            if (press) {
                 if (pincircle(mousepos, position, radius)) {
-                    clicked(mousepos);
+                    held = true;
                 }
+            }
+            if (release) {
+                held = false;
+            }
+            if (held) {
+                clicked(mousepos, 50);
             }
             velocity = wallbounce(0, 1000, 0, 1000, position, velocity, radius, radius);
             position = Vector2Add(position, velocity);
@@ -104,8 +113,6 @@ class rectcollider {
 
         void clicked(Vector2 mousepos) {
             Vector2 dif = Vector2Subtract(mousepos, position);
-            //dif.x *= 2;
-            //dif.y *= 2;
             velocity = dif;
         }
 
@@ -116,7 +123,7 @@ class rectcollider {
                     clicked(mousepos);
                 }
             }
-            velocity = wallbounce(0, 1000, 0, 1000, position, velocity, sizex / 2, sizey / 2);
+            velocity = wallbounce(1000, 800, 00, 1000, position, velocity, sizex / 2, sizey / 2);
             position = Vector2Add(position, velocity);
         }
 
@@ -185,7 +192,7 @@ class createobject {
             if (start.y < end.y) { centre.y = start.y + s.y / 2; }
             else { centre.y = end.y + s.y / 2; }
 
-            return ballcollider(radius(), centre.x, centre.y, 1, 0.2, -0.2);
+            return ballcollider(radius(), centre.x, centre.y);
         }
         rectcollider finishcreationr(Vector2 mousepos) {
             end = mousepos;
@@ -198,7 +205,7 @@ class createobject {
             if (start.y < end.y) { centre.y = start.y + s.y / 2; }
             else { centre.y = end.y + s.y / 2; }
 
-            return rectcollider(s.x, s.y, centre.x, centre.y, 1, 0.5, 0.2);
+            return rectcollider(s.x, s.y, centre.x, centre.y);
         }
         Vector2 get_start() {
             return start;
@@ -276,7 +283,7 @@ int main(void) {
         int rectscount = rects.size();
 
         for (int i = 0; i < ballscount; i++) {
-            balls.at(i).update(mousepos, mousedown);
+            balls.at(i).update(mousepos, IsMouseButtonPressed(0), IsMouseButtonReleased(0));
         }
         for (int i = 0; i < rectscount; i++) {
             rects.at(i).update(mousepos, mousedown);
