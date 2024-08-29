@@ -1,6 +1,6 @@
 #include <iostream>
-#include "raylib.h"
-#include "raymath.h"
+#include <raylib.h>
+#include <raymath.h>
 #include <vector>
 
 bool pincircle(Vector2 ppos, Vector2 cpos, float radius) {
@@ -22,7 +22,7 @@ bool pinrect(Vector2 ppos, Vector2 cpos, Vector2 size) {
     return false;
 }
 
-void resolvecollision(Vector2 &vel1, Vector2 &vel2, float angle) {
+void resolvecollision(Vector2& vel1, Vector2& vel2, float angle) {
     Vector2 rotatedv1 = Vector2Rotate(vel1, -angle);
     Vector2 rotatedv2 = Vector2Rotate(vel2, -angle);
     rotatedv1.y *= -1;
@@ -45,7 +45,7 @@ static Vector2 wallbounce(int lowx, int highx, int lowy, int highy, Vector2 pos,
     }
     else if (pos.y <= lowy + ydistance) {
         finalvel.y = abs(vel.y);
-    }
+    } // 
     return finalvel;
 }
 
@@ -95,6 +95,10 @@ public:
         }
         velocity = wallbounce(0, 1000, 0, 1000, position, velocity, radius, radius);
         position = Vector2Add(position, velocity);
+    }
+
+    void draw() {
+        DrawCircleV(position, radius, BLACK);
     }
 
     float get_r() {
@@ -203,6 +207,8 @@ public:
         rcol = rectcollider();
         shape = "ball";
     }
+
+    // UPDATE
     void update(Vector2 mousepos, bool press, bool release) {
         if (shape == "ball") {
             bcol.update(mousepos, press, release);
@@ -355,11 +361,8 @@ int main(void) {
         for (int i = 0; i < ballscount; i++) {
             balls.at(i).update(mousepos, IsMouseButtonPressed(0), IsMouseButtonReleased(0));
             if (balls.at(i).shape == "ball") {
-                ballcollider current = *balls.at(i).get_ball();
-                Vector2 nulvect;
-                nulvect.x = 0;
-                nulvect.y = 0;
-                current.set_vel(nulvect);
+                ballcollider * current = balls.at(i).get_ball();
+                //current->set_vel(Vector2 {0, 0});
             }
         }
 
@@ -385,7 +388,7 @@ int main(void) {
 
             if (balls.at(i).shape == "ball") {
                 Vector2 pos = currentb.get_pos();
-                DrawCircleV(pos, currentb.get_r(), BLACK);
+                currentb.draw();
             }
             else {
                 Vector2 pos = currentr.get_corner();
