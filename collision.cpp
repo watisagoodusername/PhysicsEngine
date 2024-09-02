@@ -26,7 +26,7 @@ bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
     float xdif = pos1.x - pos2.x;
     float ydif = pos1.y - pos2.y;
     float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
-    if (tdif < rad1+rad2) {
+    if (tdif < rad1 + rad2) {
         return true;
     }
     return false;
@@ -35,15 +35,22 @@ bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
 void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {//move circles outside eachother
     float xdif = pos1.x - pos2.x;
     float ydif = pos1.y - pos2.y;
+    float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
 
-    //x^2 + y^2 = r^2
-    //x = sqrt(r^2 - y^2)
-    //y = sqrt(r^2 - x^2)
+    xdif /= tdif;
+    ydif /= tdif;//normalised
 
-    pos1.x += xdif;
-    pos1.y += ydif;
-    pos2.x -= xdif;
-    pos2.y -= ydif;
+    float rt = r1 + r2;
+
+    float tomovetotal = rt - tdif;
+
+    float tomove1 = (r2 * tomovetotal) / (r1 + r2);
+    float tomove2 = (r1 * tomovetotal) / (r1 + r2);
+
+    pos1.x += xdif * tomove1;
+    pos1.y += ydif * tomove1;
+    pos2.x -= xdif * tomove2;
+    pos2.y -= ydif * tomove2;
 }
 
 void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle) {
@@ -373,7 +380,7 @@ int main(void) {
     int screenheight = 1000;
     InitWindow(screenwidth, screenheight, "physics");
 
-    SetTargetFPS(60);
+    SetTargetFPS(1);
 
     createobject ct("ball");
 
