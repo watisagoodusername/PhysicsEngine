@@ -53,12 +53,13 @@ void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {/
     pos2.y -= ydif * tomove2;
 }
 
-void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle) {
+void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle, float restitution) {
     Vector2 rotatedv1 = Vector2Rotate(vel1, angle);
     Vector2 rotatedv2 = Vector2Rotate(vel2, angle);//rotates points so x axis is normal to makle calculations easier
 
-    float v1 = ((m1 - m2) / (m1 + m2)) * rotatedv1.y + ((2 * m2) / (m1 + m2)) * rotatedv2.y;
-    float v2 = ((m2 - m1) / (m2 + m1)) * rotatedv2.y + ((2 * m1) / (m2 + m1)) * rotatedv1.y;;//calculations for 1D elastic collision from wikipedia
+
+    float v1 = (restitution * m2 * (rotatedv2.y - rotatedv1.y) + m1 * rotatedv1.y + m2 * rotatedv2.y) / (m1 + m2);
+    float v2 = (restitution * m1 * (rotatedv1.y - rotatedv2.y) + m2 * rotatedv2.y + m1 * rotatedv1.y) / (m2 + m1);//final velocity calculations for 1D inelastic collisions
 
     rotatedv1.y = v1;
     rotatedv2.y = v2;
@@ -380,11 +381,11 @@ int main(void) {
     int screenheight = 1000;
     InitWindow(screenwidth, screenheight, "physics");
 
-    SetTargetFPS(1);
+    SetTargetFPS(60);
 
     createobject ct("ball");
 
-    std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4), rectcollider(25, 20, 100, 100, 1, 2, 9) };
+    std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4) };
 
     bool game = true;
     while (game)
@@ -423,6 +424,18 @@ int main(void) {
             }
         }
 
+        if (IsKeyPressed(KEY_SPACE)) {
+            for (int i = 0; i < 795; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(3, 14), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+            for (int i = 0; i < 200; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(14, 34), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+            for (int i = 0; i < 5; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(34, 70), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+        }
+
         size_t bodycount = bodies.size();
 
         for (int i = 0; i < bodycount; i++) {//update every rigidbody
@@ -455,7 +468,7 @@ int main(void) {
                                 float m2 = compare->get_m();// mass
 
                                 resolvecirclecollision(p1, p2, r1, r2);//changes p1 and p2 so they arent inside each other
-                                bounce(v1, v2, m1, m2, angle);//velocity calculations
+                                bounce(v1, v2, m1, m2, angle, 0.95);//velocity calculations
 
                                 current->set_pos(p1);
                                 compare->set_pos(p2);//applies position
