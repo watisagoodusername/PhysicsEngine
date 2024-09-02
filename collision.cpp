@@ -22,21 +22,47 @@ bool pinrect(Vector2 ppos, Vector2 cpos, Vector2 size) {// determines if a point
     return false;
 }
 
-void resolvecollision(Vector2& vel1, Vector2& vel2, float angle) {// inelastic bounce 2 objects with no rotation (doesnt work yet)
+bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
+    float xdif = pos1.x - pos2.x;
+    float ydif = pos1.y - pos2.y;
+    float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
+    if (tdif < rad1+rad2) {
+        return true;
+    }
+    return false;
+}
 
-    Vector2 rotatedv1 = Vector2Rotate(vel1, -angle);
-    Vector2 rotatedv2 = Vector2Rotate(vel2, -angle);//rotates points so x axis is normal to makle calculations easier
+void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {//move circles outside eachother
+    float xdif = pos1.x - pos2.x;
+    float ydif = pos1.y - pos2.y;
 
-    rotatedv1.y *= -1;
-    rotatedv2.y *= -1;//calculations for 1D collision(not right)
+    //x^2 + y^2 = r^2
+    //x = sqrt(r^2 - y^2)
+    //y = sqrt(r^2 - x^2)
 
-    vel1 = Vector2Rotate(rotatedv1, angle);
-    vel2 = Vector2Rotate(rotatedv2, angle);//return updated velocities
+    pos1.x += xdif;
+    pos1.y += ydif;
+    pos2.x -= xdif;
+    pos2.y -= ydif;
+}
+
+void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle) {
+    Vector2 rotatedv1 = Vector2Rotate(vel1, angle);
+    Vector2 rotatedv2 = Vector2Rotate(vel2, angle);//rotates points so x axis is normal to makle calculations easier
+
+    float v1 = ((m1 - m2) / (m1 + m2)) * rotatedv1.y + ((2 * m2) / (m1 + m2)) * rotatedv2.y;
+    float v2 = ((m2 - m1) / (m2 + m1)) * rotatedv2.y + ((2 * m1) / (m2 + m1)) * rotatedv1.y;;//calculations for 1D elastic collision from wikipedia
+
+    rotatedv1.y = v1;
+    rotatedv2.y = v2;
+
+    vel1 = Vector2Rotate(rotatedv1, -angle);
+    vel2 = Vector2Rotate(rotatedv2, -angle);//return updated velocities
 }
 
 static Vector2 wallbounce(int lowx, int highx, int lowy, int highy, Vector2 pos, Vector2 vel, float xdistance, float ydistance) {
     //takes an object size xdistance by ydistance and reflects velocity if outside x/y bounds
-    
+
     Vector2 finalvel = vel;
     if (pos.x >= highx - xdistance) {
         finalvel.x = -abs(vel.x);
@@ -49,11 +75,11 @@ static Vector2 wallbounce(int lowx, int highx, int lowy, int highy, Vector2 pos,
     }
     else if (pos.y <= lowy + ydistance) {
         finalvel.y = abs(vel.y);
-    } 
+    }
     return finalvel;
 }
 
-class ballcollider {
+class ballcollider {// class for ball rigidbody
     float radius;
     float mass;
     Vector2 velocity;
@@ -120,9 +146,12 @@ public:
     void set_vel(Vector2 v) {
         velocity = v;
     }
+    void set_pos(Vector2 p) {
+        position = p;
+    }
 };
 
-class rectcollider {
+class rectcollider { //class for rect rigidbody
     float sizex;
     float sizey;
     float mass;
@@ -171,6 +200,10 @@ public:
         position = Vector2Add(position, velocity);
     }
 
+    void draw() {
+        DrawRectangle(position.x, position.y, sizex, sizey, BLACK);
+    }
+
     float get_xsize() {
         return sizex;
     }
@@ -194,9 +227,9 @@ public:
     }
 };
 
-class rigidbody {
+class rigidbody { // class to hold and type of rigidbody collider
     rectcollider rcol;
-    ballcollider bcol;
+    ballcollider bcol;//contains both a ball and rigidbody collider but only one is active at a time (is a problem needs fixing)
 
 public:
     std::string shape;
@@ -222,6 +255,15 @@ public:
         }
     }
 
+    void draw() {
+        if (shape == "ball") {
+            bcol.draw();
+        }
+        else {
+            rcol.draw();
+        }
+    }
+
     ballcollider* get_ball() {
         return &bcol;
     }
@@ -231,7 +273,7 @@ public:
     }
 };
 
-class createobject {
+class createobject {//contains information about object to be created 
     Vector2 start;
     Vector2 end;
     Vector2 centre;
@@ -265,7 +307,7 @@ public:
         start = mousepos;
         active = true;
     }
-    ballcollider finishcreationb(Vector2 mousepos) {
+    ballcollider finishcreationb(Vector2 mousepos) {//creates a ball collider
         end = mousepos;
         active = false;
 
@@ -278,7 +320,7 @@ public:
 
         return ballcollider(radius(), centre.x, centre.y);
     }
-    rectcollider finishcreationr(Vector2 mousepos) {
+    rectcollider finishcreationr(Vector2 mousepos) {//creates a rectangle collider
         end = mousepos;
         active = false;
 
@@ -291,10 +333,24 @@ public:
 
         return rectcollider(s.x, s.y, centre.x, centre.y);
     }
+    void draw(Vector2 mousepos) {
+        if (active) {
+            Vector2 pos = get_centre(mousepos);
+            if (objecttype == "ball") {
+                DrawCircleV(pos, radius(), DARKGRAY);
+            }
+            else {
+                pos.x -= static_cast<int>((mousepos.x - get_start().x) / 2);
+                pos.y -= static_cast<int>((mousepos.y - get_start().y) / 2);
+                DrawRectangle(pos.x, pos.y, static_cast<int>(mousepos.x - get_start().x), static_cast<int>(mousepos.y - get_start().y), DARKGRAY);
+            }
+        }
+    }
+
     Vector2 get_start() {
         return start;
     }
-    Vector2 get_centre(Vector2 mousepos) {
+    Vector2 get_centre(Vector2 mousepos) {//center position for circle creation
         end = mousepos;
 
         Vector2 s = size();
@@ -321,7 +377,7 @@ int main(void) {
 
     createobject ct("ball");
 
-    std::vector<rigidbody> balls = { ballcollider(20, 50, 50, 1, 5, 4), rectcollider(25, 20, 100, 100, 1, 2, 9) };
+    std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4), rectcollider(25, 20, 100, 100, 1, 2, 9) };
 
     bool game = true;
     while (game)
@@ -344,10 +400,10 @@ int main(void) {
         if (IsMouseButtonReleased(1)) {
             if (ct.active) {
                 if (ct.objecttype == "ball") {
-                    balls.push_back(ct.finishcreationb(mousepos));
+                    bodies.push_back(ct.finishcreationb(mousepos));
                 }
                 else {
-                    balls.push_back(ct.finishcreationr(mousepos));
+                    bodies.push_back(ct.finishcreationr(mousepos));
                 }
             }
         }
@@ -360,32 +416,45 @@ int main(void) {
             }
         }
 
-       size_t ballscount = balls.size();
+        size_t bodycount = bodies.size();
 
-        for (int i = 0; i < ballscount; i++) {
-            balls.at(i).update(mousepos, IsMouseButtonPressed(0), IsMouseButtonReleased(0));
-            if (balls.at(i).shape == "ball") {
-                ballcollider* current = balls.at(i).get_ball();
-                if (balls.size() >= i) {
-                    for (int j = i + 1; j < ballscount; j++) {
-                        if (balls.at(j).shape == "ball") {
-                            ballcollider* compare = balls.at(j).get_ball();
+        for (int i = 0; i < bodycount; i++) {//update every rigidbody
+            bodies.at(i).update(mousepos, IsMouseButtonPressed(0), IsMouseButtonReleased(0));
+        }
 
-                            Vector2 v1 = current->get_vel();
-                            Vector2 v2 = compare->get_vel(); //velocity values, passed by value
+        for (int i = 0; i < bodycount; i++) {//updates velocities
+            if (bodies.at(i).shape == "ball") {
+                ballcollider* current = bodies.at(i).get_ball();
+                if (bodies.size() >= i) {
+                    for (int j = i + 1; j < bodycount; j++) {
+                        if (bodies.at(j).shape == "ball") {
+                            ballcollider* compare = bodies.at(j).get_ball();
 
                             Vector2 p1 = current->get_pos();
                             Vector2 p2 = compare->get_pos();// position values
 
-                            if (pincircle(p1, p2, 2 * current->get_r())) {
+                            float r1 = current->get_r();
+                            float r2 = compare->get_r();
+
+                            if (circleoverlap(p1, p2, r1, r2)) {
                                 Vector2 dif = Vector2Subtract(p1, p2);// distance between circles
 
-                                float angle = atan2(dif.y, dif.x);
+                                float angle = atan2(dif.x, dif.y);
 
-                                resolvecollision(v1, v2, angle);
+                                Vector2 v1 = current->get_vel();
+                                Vector2 v2 = compare->get_vel(); //velocity values, passed by value
+
+                                float m1 = current->get_m();
+                                float m2 = compare->get_m();// mass
+
+                                resolvecirclecollision(p1, p2, r1, r2);//changes p1 and p2 so they arent inside each other
+                                bounce(v1, v2, m1, m2, angle);//velocity calculations
+
+                                current->set_pos(p1);
+                                compare->set_pos(p2);//applies position
 
                                 current->set_vel(v1);
-                                compare->set_vel(v2);
+                                compare->set_vel(v2);//applies velocity
                             }
                         }
                     }
@@ -397,30 +466,10 @@ int main(void) {
 
         ClearBackground(LIGHTGRAY);
 
-        if (ct.active) {
-            Vector2 pos = ct.get_centre(mousepos);
-            if (ct.objecttype == "ball") {
-                DrawCircleV(pos, ct.radius(), DARKGRAY);
-            }
-            else {
-                pos.x -= static_cast<int>((mousepos.x - ct.get_start().x) / 2);
-                pos.y -= static_cast<int>((mousepos.y - ct.get_start().y) / 2);
-                DrawRectangle(pos.x, pos.y, static_cast<int>(mousepos.x - ct.get_start().x), static_cast<int>(mousepos.y - ct.get_start().y), DARKGRAY);
-            }
-        }
+        ct.draw(mousepos);
 
-        for (int i = 0; i < ballscount; i++) {
-            ballcollider currentb = *balls.at(i).get_ball();
-            rectcollider currentr = *balls.at(i).get_rect();
-
-            if (balls.at(i).shape == "ball") {
-                Vector2 pos = currentb.get_pos();
-                currentb.draw();
-            }
-            else {
-                Vector2 pos = currentr.get_corner();
-                DrawRectangle(pos.x, pos.y, currentr.get_xsize(), currentr.get_ysize(), BLACK);
-            }
+        for (int i = 0; i < bodycount; i++) {
+            bodies.at(i).draw();
         }
 
         EndDrawing();
