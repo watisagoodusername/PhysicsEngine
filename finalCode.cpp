@@ -32,7 +32,7 @@ bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
     return false;
 }
 
-void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {//move circles outside eachother
+void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2, float m1, float m2) {//move circles outside eachother
     float xdif = pos1.x - pos2.x;
     float ydif = pos1.y - pos2.y;
     float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
@@ -44,8 +44,8 @@ void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {/
 
     float tomovetotal = rt - tdif;
 
-    float tomove1 = (r2 * tomovetotal) / (r1 + r2);
-    float tomove2 = (r1 * tomovetotal) / (r1 + r2);
+    float tomove1 = (m2 * tomovetotal) / (m1 + m2);
+    float tomove2 = (m1 * tomovetotal) / (m1 + m2);
 
     pos1.x += xdif * tomove1;
     pos1.y += ydif * tomove1;
@@ -56,7 +56,6 @@ void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {/
 void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle, float restitution) {
     Vector2 rotatedv1 = Vector2Rotate(vel1, angle);
     Vector2 rotatedv2 = Vector2Rotate(vel2, angle);//rotates points so x axis is normal to makle calculations easier
-
 
     float v1 = (restitution * m2 * (rotatedv2.y - rotatedv1.y) + m1 * rotatedv1.y + m2 * rotatedv2.y) / (m1 + m2);
     float v2 = (restitution * m1 * (rotatedv1.y - rotatedv2.y) + m2 * rotatedv2.y + m1 * rotatedv1.y) / (m2 + m1);//final velocity calculations for 1D inelastic collisions
@@ -197,7 +196,7 @@ public:
 
     void update(Vector2 mousepos, bool press, bool release) {
         if (press) {
-            if (pincircle(mousepos, position, sizex / 2)) {
+            if (pinrect(mousepos, get_corner(), Vector2 { sizex, sizey})) {
                 held = true;
             }
         }
@@ -212,7 +211,7 @@ public:
     }
 
     void draw() {
-        DrawRectangle(position.x, position.y, sizex, sizey, BLACK);
+        DrawRectangle(position.x - sizex / 2, position.y - sizey / 2, sizex, sizey, BLACK);
     }
 
     float get_xsize() {
@@ -390,6 +389,19 @@ int main(void) {
 
     std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4) };
 
+    Image wizardimg = LoadImage("Wizardofphysics.png"); // Loaded in CPU memory (RAM)
+    Image wizardimg2 = LoadImage("Wizardofphysics.png");
+
+
+    ImageResizeNN(&wizardimg, 160, 160);
+    ImageResize(&wizardimg2, 170, 170);
+
+    Texture2D wizard = LoadTextureFromImage(wizardimg);// Image converted to texture, GPU memory (VRAM)
+    Texture2D wizardshadow = LoadTextureFromImage(wizardimg2);
+
+    UnloadImage(wizardimg);
+    UnloadImage(wizardimg2);
+
     bool game = true;
     while (game)
     {
@@ -443,6 +455,9 @@ int main(void) {
                 bodies.push_back(ballcollider(GetRandomValue(8, 12), GetRandomValue(10, 990), GetRandomValue(10, 990)));
             }
         }
+        if (IsKeyPressed(KEY_W)) {
+            bodies.push_back(ballcollider(GetRandomValue(8,12), 850, 930, 1750, GetRandomValue(-5, -1), GetRandomValue(-5, -1)));
+        }
 
         size_t bodycount = bodies.size();
 
@@ -476,7 +491,7 @@ int main(void) {
                                 float m2 = compare->get_m();// mass
 
                                 bounce(v1, v2, m1, m2, angle, 0.95);//velocity calculations
-                                resolvecirclecollision(p1, p2, r1, r2);//changes p1 and p2 so they arent inside each other
+                                resolvecirclecollision(p1, p2, r1, r2, m1, m2);//changes p1 and p2 so they arent inside each other
 
                                 current->set_pos(p1);
                                 compare->set_pos(p2);//applies position
@@ -492,16 +507,22 @@ int main(void) {
 
         BeginDrawing();
 
-        ClearBackground(LIGHTGRAY);
+            ClearBackground(LIGHTGRAY);
 
-        ct.draw(mousepos);
+            ct.draw(mousepos);
 
-        for (int i = 0; i < bodycount; i++) {
-            bodies.at(i).draw();
-        }
+            for (int i = 0; i < bodycount; i++) {
+                bodies.at(i).draw();
+            }
 
+            DrawTexture(wizardshadow, screenwidth - wizard.width, screenheight - wizard.height, CLITERAL(Color){ 0, 0, 0, 64 });
+            DrawTexture(wizard, screenwidth - wizard.width, screenheight - wizard.height, WHITE);
+            
         EndDrawing();
     }
+
+    UnloadTexture(wizard);
+    UnloadTexture(wizardshadow);
 
     CloseWindow();
 
