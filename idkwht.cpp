@@ -26,7 +26,7 @@ bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
     float xdif = pos1.x - pos2.x;
     float ydif = pos1.y - pos2.y;
     float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
-    if (tdif < rad1+rad2) {
+    if (tdif < rad1 + rad2) {
         return true;
     }
     return false;
@@ -35,23 +35,31 @@ bool circleoverlap(Vector2 pos1, Vector2 pos2, float rad1, float rad2) {
 void resolvecirclecollision(Vector2& pos1, Vector2& pos2, float r1, float r2) {//move circles outside eachother
     float xdif = pos1.x - pos2.x;
     float ydif = pos1.y - pos2.y;
+    float tdif = sqrt(xdif * xdif + ydif * ydif);//distance between points
 
-    //x^2 + y^2 = r^2
-    //x = sqrt(r^2 - y^2)
-    //y = sqrt(r^2 - x^2)
+    xdif /= tdif;
+    ydif /= tdif;//normalised
 
-    pos1.x += xdif;
-    pos1.y += ydif;
-    pos2.x -= xdif;
-    pos2.y -= ydif;
+    float rt = r1 + r2;
+
+    float tomovetotal = rt - tdif;
+
+    float tomove1 = (r2 * tomovetotal) / (r1 + r2);
+    float tomove2 = (r1 * tomovetotal) / (r1 + r2);
+
+    pos1.x += xdif * tomove1;
+    pos1.y += ydif * tomove1;
+    pos2.x -= xdif * tomove2;
+    pos2.y -= ydif * tomove2;
 }
 
-void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle) {
+void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle, float restitution) {
     Vector2 rotatedv1 = Vector2Rotate(vel1, angle);
     Vector2 rotatedv2 = Vector2Rotate(vel2, angle);//rotates points so x axis is normal to makle calculations easier
 
-    float v1 = ((m1 - m2) / (m1 + m2)) * rotatedv1.y + ((2 * m2) / (m1 + m2)) * rotatedv2.y;
-    float v2 = ((m2 - m1) / (m2 + m1)) * rotatedv2.y + ((2 * m1) / (m2 + m1)) * rotatedv1.y;;//calculations for 1D elastic collision from wikipedia
+
+    float v1 = (restitution * m2 * (rotatedv2.y - rotatedv1.y) + m1 * rotatedv1.y + m2 * rotatedv2.y) / (m1 + m2);
+    float v2 = (restitution * m1 * (rotatedv1.y - rotatedv2.y) + m2 * rotatedv2.y + m1 * rotatedv1.y) / (m2 + m1);//final velocity calculations for 1D inelastic collisions
 
     rotatedv1.y = v1;
     rotatedv2.y = v2;
@@ -60,23 +68,26 @@ void bounce(Vector2& vel1, Vector2& vel2, float m1, float m2, float angle) {
     vel2 = Vector2Rotate(rotatedv2, -angle);//return updated velocities
 }
 
-static Vector2 wallbounce(int lowx, int highx, int lowy, int highy, Vector2 pos, Vector2 vel, float xdistance, float ydistance) {
+void wallbounce(int lowx, int highx, int lowy, int highy, Vector2& pos, Vector2& vel, float xdistance, float ydistance) {
     //takes an object size xdistance by ydistance and reflects velocity if outside x/y bounds
 
-    Vector2 finalvel = vel;
     if (pos.x >= highx - xdistance) {
-        finalvel.x = -abs(vel.x);
+        vel.x = -abs(vel.x);
+        pos.x = highx - xdistance;
     }
     else if (pos.x <= lowx + xdistance) {
-        finalvel.x = abs(vel.x);
+        vel.x = abs(vel.x);
+        pos.x = lowx + xdistance;
     }
     if (pos.y >= highy - ydistance) {
-        finalvel.y = -abs(vel.y);
+        vel.y = -abs(vel.y);
+        pos.y = highy - ydistance;
     }
     else if (pos.y <= lowy + ydistance) {
-        finalvel.y = abs(vel.y);
+        vel.y = abs(vel.y);
+        pos.y = lowy + ydistance;
     }
-    return finalvel;
+
 }
 
 class ballcollider {// class for ball rigidbody
@@ -108,7 +119,7 @@ public:
         Vector2 dif = Vector2Subtract(mousepos, position);
         dif = Vector2ClampValue(dif, 0, maxspeed);
         velocity = dif;
-        position = Vector2Subtract(mousepos, dif);
+        //position = Vector2Subtract(mousepos, dif);
     }
 
     void update(Vector2 mousepos, bool press, bool release) {
@@ -123,8 +134,8 @@ public:
         if (held) {
             clicked(mousepos, 50);
         }
-        velocity = wallbounce(0, 1000, 0, 1000, position, velocity, radius, radius);
         position = Vector2Add(position, velocity);
+        wallbounce(0, 1000, 0, 1000, position, velocity, radius, radius);
     }
 
     void draw() {
@@ -196,7 +207,7 @@ public:
         if (held) {
             clicked(mousepos);
         }
-        velocity = wallbounce(000, 1000, 00, 1000, position, velocity, sizex / 2, sizey / 2);
+        wallbounce(000, 1000, 00, 1000, position, velocity, sizex / 2, sizey / 2);
         position = Vector2Add(position, velocity);
     }
 
@@ -377,7 +388,7 @@ int main(void) {
 
     createobject ct("ball");
 
-    std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4), rectcollider(25, 20, 100, 100, 1, 2, 9) };
+    std::vector<rigidbody> bodies = { ballcollider(20, 50, 50, 1, 5, 4) };
 
     bool game = true;
     while (game)
@@ -416,6 +427,23 @@ int main(void) {
             }
         }
 
+        if (IsKeyPressed(KEY_SPACE)) {
+            for (int i = 0; i < 795; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(3, 14), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+            for (int i = 0; i < 200; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(14, 34), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+            for (int i = 0; i < 5; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(34, 70), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+        }
+        if (IsKeyPressed(KEY_B)) {
+            for (int i = 0; i < 1500; i++) {
+                bodies.push_back(ballcollider(GetRandomValue(8, 12), GetRandomValue(10, 990), GetRandomValue(10, 990)));
+            }
+        }
+
         size_t bodycount = bodies.size();
 
         for (int i = 0; i < bodycount; i++) {//update every rigidbody
@@ -447,8 +475,8 @@ int main(void) {
                                 float m1 = current->get_m();
                                 float m2 = compare->get_m();// mass
 
+                                bounce(v1, v2, m1, m2, angle, 0.95);//velocity calculations
                                 resolvecirclecollision(p1, p2, r1, r2);//changes p1 and p2 so they arent inside each other
-                                bounce(v1, v2, m1, m2, angle);//velocity calculations
 
                                 current->set_pos(p1);
                                 compare->set_pos(p2);//applies position
